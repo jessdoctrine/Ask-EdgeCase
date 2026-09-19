@@ -9,7 +9,6 @@ type Mode = "straight" | "evidence" | "challenge";
 type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
-  mode?: Mode;
 };
 
 const MAX_MESSAGE_LENGTH = 6000;
@@ -33,6 +32,16 @@ function jsonError(error: string, message: string, status: number): Response {
 
 function isMode(value: unknown): value is Mode {
   return value === "straight" || value === "evidence" || value === "challenge";
+}
+
+function isConversationMessage(value: unknown): value is ConversationMessage {
+  if (!value || typeof value !== "object") return false;
+  const message = value as Partial<ConversationMessage>;
+  return (
+    (message.role === "user" || message.role === "assistant") &&
+    typeof message.content === "string" &&
+    message.content.length <= MAX_MESSAGE_LENGTH
+  );
 }
 
 export const onRequestPost = async (context: PagesContext): Promise<Response> => {
@@ -81,17 +90,7 @@ export const onRequestPost = async (context: PagesContext): Promise<Response> =>
   const conversation = Array.isArray(body.conversation)
     ? body.conversation.slice(-MAX_CONTEXT_MESSAGES)
     : [];
-  if (
-    conversation.some(
-      (item) =>
-        !item ||
-        typeof item !== "object" ||
-        (item as ConversationMessage).role !== "user" &&
-          (item as ConversationMessage).role !== "assistant" ||
-        typeof (item as ConversationMessage).content !== "string" ||
-        (item as ConversationMessage).content.length > MAX_MESSAGE_LENGTH,
-    )
-  ) {
+  if (conversation.some((item) => !isConversationMessage(item))) {
     return jsonError("INVALID_CONVERSATION", "Conversation history contains an invalid message.", 400);
   }
 
@@ -133,7 +132,7 @@ export const onRequestPost = async (context: PagesContext): Promise<Response> =>
     const providerResponse = await fetch(OPENROUTER_ENDPOINT, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: "Bearer " + apiKey,
         "Content-Type": "application/json",
         "X-Title": "Ask EdgeCase",
       },
@@ -168,7 +167,11 @@ export const onRequestPost = async (context: PagesContext): Promise<Response> =>
     if (error instanceof Error && error.name === "AbortError") {
       return jsonError("REQUEST_TIMEOUT", "The model took too long to respond. Please try again.", 504);
     }
-    return jsonError("PROVIDER_UNAVAILABLE", "The model is temporarily unavailable. Please try again shortly.", 502);
+    return jsonError(
+      "PROVIDER_UNAVAILABLE",
+      "The model is temporarily unavailable. Please try again shortly.",
+      502,
+    );
   } finally {
     clearTimeout(timeout);
   }
