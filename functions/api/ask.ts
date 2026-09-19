@@ -1,3 +1,5 @@
+import type { PagesFunction } from "@cloudflare/workers-types";
+
 type Env = {
   OPENROUTER_API_KEY: string;
 };
