@@ -1,9 +1,6 @@
-interface PagesContext {
-  request: Request;
-  env: {
-    OPENROUTER_API_KEY?: string;
-  };
-}
+type Env = {
+  OPENROUTER_API_KEY: string;
+};
 
 type Mode = "straight" | "evidence" | "challenge";
 type ConversationMessage = {
@@ -44,7 +41,7 @@ function isConversationMessage(value: unknown): value is ConversationMessage {
   );
 }
 
-export const onRequestPost = async (context: PagesContext): Promise<Response> => {
+export const onRequestPost: PagesFunction<Env> = async (context) => {
   let body: {
     message?: unknown;
     mode?: unknown;
@@ -94,7 +91,7 @@ export const onRequestPost = async (context: PagesContext): Promise<Response> =>
     return jsonError("INVALID_CONVERSATION", "Conversation history contains an invalid message.", 400);
   }
 
-  const apiKey = context.env.OPENROUTER_API_KEY?.trim();
+  const apiKey = context.env.OPENROUTER_API_KEY.trim();
   if (!apiKey) {
     return jsonError(
       "MODEL_NOT_CONFIGURED",
