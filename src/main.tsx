@@ -6,7 +6,7 @@ type Mode = "straight" | "evidence" | "challenge";
 type Message = { id: string; role: "user" | "assistant"; content: string; mode?: Mode; time?: string };
 type Conversation = { id: string; title: string; updatedAt: string; messages: Message[] };
 
-const MAX_MESSAGE_LENGTH = 4000;
+const MAX_MESSAGE_LENGTH = 6000;
 const STORAGE_KEY = "ask-edgecase-conversations";
 
 const modeDetails: Record<Mode, { label: string; short: string; description: string }> = {
@@ -98,12 +98,25 @@ function App() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: trimmed, mode, noBs }) });
-      const result = (await response.json()) as { message?: string };
+      const response = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: trimmed,
+          mode,
+          noBs,
+          conversation: [...current.messages, userMessage].slice(-20),
+        }),
+      });
+      const result = (await response.json()) as { message?: string; error?: string };
+      if (!response.ok && result.error !== "MODEL_NOT_CONFIGURED") {
+        setError(result.message ?? "We couldn’t reach the conversation layer. Try again.");
+        return;
+      }
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: result.message ?? (response.status === 503 ? "The conversation layer is ready, but the model is not configured yet." : "Something went wrong while preparing a response."),
+        content: result.message ?? "The conversation layer did not return an answer.",
         mode,
       };
       setConversations((items) => items.map((item) => item.id === current.id ? { ...item, messages: [...item.messages, assistantMessage] } : item));
