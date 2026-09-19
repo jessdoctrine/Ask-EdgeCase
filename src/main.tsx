@@ -109,7 +109,17 @@ function App() {
         }),
       });
       const result = (await response.json()) as { message?: string; error?: string };
-      if (!response.ok && result.error !== "MODEL_NOT_CONFIGURED") {
+      if (result.error === "MODEL_NOT_CONFIGURED") {
+        const assistantMessage: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: result.message ?? "The conversation layer is not configured yet.",
+          mode,
+        };
+        setConversations((items) => items.map((item) => item.id === current.id ? { ...item, messages: [...item.messages, assistantMessage] } : item));
+        return;
+      }
+      if (!response.ok) {
         setError(result.message ?? "We couldn’t reach the conversation layer. Try again.");
         return;
       }

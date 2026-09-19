@@ -94,7 +94,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   const apiKey = context.env.OPENROUTER_API_KEY;
-  if (!apiKey || apiKey.trim().length === 0) {
+  if (typeof apiKey !== "string" || apiKey.trim().length === 0) {
     return jsonError(
       "MODEL_NOT_CONFIGURED",
       "Ask EdgeCase is ready, but no model provider is configured yet.",
