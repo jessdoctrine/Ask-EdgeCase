@@ -89,6 +89,14 @@ textarea { display: block; width: 100%; resize: none; background: transparent; c
 textarea::placeholder { color: #777a80; }
 .composer-actions { display: flex; align-items: center; gap: 2px; padding: 2px 7px 7px; }
 .composer-actions .icon-button { padding: 7px; }.composer-actions .icon-button:hover { color: var(--orange-bright); }
+.composer-actions .icon-button.listening { color: var(--orange-bright); background: #3a1f15; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.attachment-chip { display: inline-flex; align-items: center; gap: 7px; margin: 10px 14px 0; max-width: calc(100% - 28px); padding: 6px 8px; border: 1px solid #493024; border-radius: 6px; background: #201612; color: #e6b09b; font-size: 11px; }
+.attachment-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-chip svg { width: 14px; height: 14px; color: var(--orange-bright); flex: 0 0 auto; }
+.attachment-chip button { display: inline-flex; border: 0; background: transparent; color: #a98275; padding: 2px; cursor: pointer; }
+.attachment-chip button:hover { color: #ffd1c0; }
+.attachment-chip button svg { width: 13px; height: 13px; }
 .character-count { font: 10px "DM Mono", monospace; color: #62656b; margin-left: auto; padding: 0 8px; }
 .send-button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 7px; background: var(--orange); color: #180b06; cursor: pointer; }
 .send-button:hover { background: var(--orange-bright); }.send-button:disabled { background: #34363b; color: #6d7076; cursor: not-allowed; }

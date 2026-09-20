@@ -1,10 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 type Mode = "straight" | "evidence" | "challenge";
 type Message = { id: string; role: "user" | "assistant"; content: string; mode?: Mode; time?: string };
 type Conversation = { id: string; title: string; updatedAt: string; messages: Message[] };
+type Attachment = { name: string; content: string };
+type SpeechRecognitionResultEvent = Event & {
+  results: { [index: number]: { [index: number]: { transcript: string } } };
+};
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
 
 const MAX_MESSAGE_LENGTH = 6000;
 const STORAGE_KEY = "ask-edgecase-conversations";
@@ -58,6 +76,10 @@ function App() {
   const [error, setError] = useState("");
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
@@ -78,11 +100,15 @@ function App() {
     setActiveId("new");
     setDraft("");
     setError("");
+    setAttachment(null);
     if (window.innerWidth < 800) setSidebarOpen(false);
   };
 
   const sendMessage = async () => {
-    const trimmed = draft.trim();
+    const attachedContext = attachment
+      ? `\n\n[Attached file: ${attachment.name}]\n${attachment.content}`
+      : "";
+    const trimmed = `${draft.trim()}${attachedContext}`.trim();
     if (!trimmed || isLoading) return;
     if (trimmed.length > MAX_MESSAGE_LENGTH) {
       setError(`Keep your message under ${MAX_MESSAGE_LENGTH.toLocaleString()} characters.`);
@@ -94,6 +120,7 @@ function App() {
     setConversations((items) => [...items.filter((item) => item.id !== current.id), { ...current, messages: nextMessages, title: current.title === "New chat" ? trimmed.slice(0, 42) : current.title, updatedAt: "Just now" }]);
     setActiveId(current.id);
     setDraft("");
+    setAttachment(null);
     setError("");
     setIsLoading(true);
 
@@ -116,6 +143,7 @@ function App() {
           content: result.message ?? "The conversation layer is not configured yet.",
           mode,
         };
+
         setConversations((items) => items.map((item) => item.id === current.id ? { ...item, messages: [...item.messages, assistantMessage] } : item));
         return;
       }
@@ -136,6 +164,60 @@ function App() {
       setIsLoading(false);
     }
   };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 200_000) {
+      setError("Files must be 200 KB or smaller for this prototype.");
+      return;
+    }
+    if (!file.type.startsWith("text/") && !/\.(csv|json|md|txt|log)$/i.test(file.name)) {
+      setError("Attach a text, CSV, JSON, Markdown, or log file.");
+      return;
+    }
+    try {
+      setAttachment({ name: file.name, content: await file.text() });
+      setError("");
+    } catch {
+      setError("We couldn’t read that file. Try a plain-text file.");
+    }
+  };
+
+  const toggleMicrophone = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SpeechRecognition = (window as SpeechRecognitionWindow).SpeechRecognition
+      ?? (window as SpeechRecognitionWindow).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("Voice input is not supported in this browser.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) setDraft((current) => `${current}${current ? " " : ""}${transcript}`);
+    };
+    recognition.onerror = () => {
+      setError("Microphone input was unavailable. Check browser permission and try again.");
+      setIsListening(false);
+    };
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setIsListening(false);
+    };
+    recognitionRef.current = recognition;
+    setError("");
+    setIsListening(true);
+    recognition.start();
+  };
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   return (
     <div className="app-shell">
@@ -193,8 +275,9 @@ function App() {
             <label className={`toggle ${noBs ? "on" : ""}`}><input type="checkbox" checked={noBs} onChange={(event) => setNoBs(event.target.checked)} /><span className="toggle-track"><span /></span><span>No BS</span></label>
           </div>
           <form className="composer" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
+            {attachment && <div className="attachment-chip"><Icon name="paperclip" /><span>{attachment.name}</span><button type="button" onClick={() => setAttachment(null)} aria-label={`Remove ${attachment.name}`}><Icon name="close" /></button></div>}
             <textarea value={draft} onChange={(event) => { setDraft(event.target.value); if (error) setError(""); }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="Ask anything worth thinking about..." aria-label="Message Ask EdgeCase" maxLength={MAX_MESSAGE_LENGTH} rows={1} />
-            <div className="composer-actions"><button type="button" className="icon-button" aria-label="Attach a file (coming soon)" title="Attachments coming soon"><Icon name="paperclip" /></button><button type="button" className="icon-button" aria-label="Use microphone (coming soon)" title="Voice input coming soon"><Icon name="mic" /></button><span className="character-count">{draft.length > 0 ? `${draft.length}/${MAX_MESSAGE_LENGTH}` : "↵"}</span><button className="send-button" type="submit" aria-label="Send message" disabled={!draft.trim() || isLoading}><Icon name="send" /></button></div>
+            <div className="composer-actions"><input ref={fileInputRef} className="visually-hidden" type="file" accept=".txt,.md,.csv,.json,.log,text/plain,text/csv,application/json" onChange={(event) => void handleFileChange(event)} /><button type="button" className="icon-button" aria-label="Attach a text file" title="Attach a text file" onClick={() => fileInputRef.current?.click()}><Icon name="paperclip" /></button><button type="button" className={`icon-button ${isListening ? "listening" : ""}`} aria-label={isListening ? "Stop microphone" : "Use microphone"} title={isListening ? "Stop microphone" : "Use microphone"} onClick={toggleMicrophone}><Icon name="mic" /></button><span className="character-count">{draft.length + (attachment?.content.length ?? 0) > 0 ? `${draft.length + (attachment?.content.length ?? 0)}/${MAX_MESSAGE_LENGTH}` : "↵"}</span><button className="send-button" type="submit" aria-label="Send message" disabled={(!draft.trim() && !attachment) || isLoading}><Icon name="send" /></button></div>
           </form>
           <p className="composer-note">EdgeCase can be wrong. Verify important information with the sources.</p>
         </div>
