@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import "./styles.css";
 
 type Mode = "straight" | "evidence" | "challenge";
@@ -220,7 +221,9 @@ function App() {
   useEffect(() => () => recognitionRef.current?.stop(), []);
 
   return (
-    <div className="app-shell">
+    <>
+      <Analytics />
+      <div className="app-shell">
       {sidebarOpen && <button className="scrim" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand-row">
@@ -283,6 +286,7 @@ function App() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 
