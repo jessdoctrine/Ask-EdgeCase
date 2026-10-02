@@ -221,7 +221,9 @@ function App() {
   useEffect(() => () => recognitionRef.current?.stop(), []);
 
   return (
-    <div className="app-shell">
+    <>
+      <Analytics />
+      <div className="app-shell">
       {sidebarOpen && <button className="scrim" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand-row">
@@ -284,6 +286,7 @@ function App() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 
